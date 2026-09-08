@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<!--
+  1EG Passport durable-URL redirect — GitHub Pages form.
+  Project Blackbook PB-PP-1EG-ARCH-2026-09-08-02.
+
+  GitHub Pages cannot issue a true HTTP 3xx for a dynamic path, so this 404.html
+  (served for every unmatched path on the site) performs a CLIENT-SIDE redirect.
+  It preserves the Record ID exactly and hands it to the SharePoint Passport page
+  as ?p=<RecordID>. Item-vs-Container routing is done by the SPFx page itself.
+
+  This is the PILOT mechanism only. Production should use a host that issues a
+  real HTTP 301/302 (Cloudflare Pages / Netlify _redirects, or Azure Static Web
+  Apps route rules). See the ARCH record.
+
+  No tracking parameters, no session info, no SharePoint URL is ever encoded in
+  the QR — only https://passport.greenglassvarano.com/1EG/<RecordID>.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>1 Edmund Gate — Preserved Item Passport</title>
+<style>
+  html,body{height:100%;margin:0}
+  body{display:flex;align-items:center;justify-content:center;
+       font:15px/1.5 "Segoe UI",Helvetica,Arial,sans-serif;color:#1d1d1b;background:#fff}
+  .b{text-align:center;padding:24px}
+  .r{border-top:6px solid #FF7F32;width:180px;margin:0 auto 18px}
+  a{color:#28724F}
+</style>
+</head>
+<body>
+<div class="b">
+  <div class="r"></div>
+  <p>Opening the Passport…</p>
+  <p><a id="fallback" href="https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx">Continue</a></p>
+</div>
+<script>
+(function () {
+  "use strict";
+  var DEST = "https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx";
+  // path is like "/1EG/1EG-0001" or "/1EG/1EG-C-0001" or "/1EG/" or "/" (or a custom-domain path)
+  var path = window.location.pathname || "/";
+  var m = path.match(/\/1EG\/([^\/?#]+)/i);   // capture the Record ID segment verbatim
+  var target = DEST;
+  if (m && m[1]) {
+    var recordId = decodeURIComponent(m[1]).trim();
+    // Preserve the Record ID exactly; the SPFx page validates it and shows
+    // "Passport not found" for anything that isn't a real Item/Container.
+    target = DEST + "?p=" + encodeURIComponent(recordId);
+  }
+  document.getElementById("fallback").setAttribute("href", target);
+  // replace() so the redirect stub never enters the browser's back history
+  window.location.replace(target);
+})();
+</script>
+</body>
+</html>
