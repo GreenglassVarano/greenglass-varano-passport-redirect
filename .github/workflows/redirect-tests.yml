@@ -1,0 +1,47 @@
+# 1EG Passport redirect host — routing-contract tests.
+# Project Blackbook HK09 Phase 2A.
+#
+# Runs the deterministic, offline routing-contract suite against the SHIPPED
+# `_redirects` file on every push and pull request, so the rule table and its
+# tests cannot drift apart. No network, no secrets, no deployment.
+name: Redirect contract tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  route-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Routing contract (parses _redirects, asserts the governed behaviour)
+        run: node route-test.js
+
+      - name: Rollback files must remain intact until HK09 closes
+        run: |
+          set -e
+          for f in index.html 404.html CNAME; do
+            test -f "$f" || { echo "::error::rollback file $f is missing"; exit 1; }
+          done
+          echo "index.html, 404.html and CNAME are present"
+
+      - name: CNAME must remain the durable public identity
+        run: |
+          set -e
+          expected="passport.greenglassvarano.com"
+          actual="$(tr -d '[:space:]' < CNAME)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::CNAME is '$actual', expected '$expected'"
+            exit 1
+          fi
+          echo "CNAME = $actual"
