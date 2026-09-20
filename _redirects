@@ -1,40 +1,40 @@
 # 1EG Passport — durable-URL redirect host (Cloudflare Pages `_redirects`)
-# Project Blackbook HK09 Phase 2A. Governing repo: GreenglassVarano/greenglass-varano-preconstruction-kb
+# Project Blackbook HK09 Phase 2A / 2A.1.
 #
 # THE DURABLE PUBLIC CONTRACT IS THE HOSTNAME AND PATH, PERMANENTLY:
 #     https://passport.greenglassvarano.com/1EG/<RecordID>
 # The SharePoint destination below is REPLACEABLE IMPLEMENTATION DETAIL.
 #
+# ROUTING AUTHORITY IS SPLIT, DELIBERATELY:
+#   /1EG/<one-segment>  ->  functions/1EG/[id].js   (the Pages Function)
+#   everything else     ->  the rules in this file
+#
+# THE DYNAMIC RECORD-ID RULES WERE REMOVED FROM THIS FILE IN 2A.1. Cloudflare
+# substitutes a captured placeholder VERBATIM AND UNENCODED, so a raw `&` in the
+# path escaped the `p` parameter and created a second destination parameter —
+# proven on the real edge. No rule below substitutes ANY captured value, so no
+# rule below can be made to do that. Do not reintroduce a `:placeholder` rule
+# that lands untrusted input in a query string.
+#
 # STATUS CODES — deliberate:
-#   302 for the durable-host -> current-SharePoint hop. NEVER 301.
-#       A cacheable permanent redirect would burn today's SharePoint URL into
-#       clients and weaken future portability. The hostname is permanent; the
-#       backend is not.
+#   302 for the durable-host -> current-SharePoint hop. NEVER 301. The hostname is
+#       permanent; the SharePoint URL is not, and a cacheable permanent redirect
+#       would weaken future portability.
 #   301 only to canonicalise an ALTERNATE HOSTING hostname onto the durable one.
 #
-# ORDER MATTERS — first match wins. Specific rules precede general ones.
-#
-# THE REDIRECT HOST IS DELIBERATELY DUMB. It does not validate that a Record ID
-# exists. Well-formed-but-absent and malformed IDs are both forwarded; the SPFx
-# Passport page decides what to show.
+# ORDER MATTERS — first match wins.
 
-# --- /1EG/<RecordID> : the governed contract ------------------------------------
-# Trailing-slash form first, so /1EG/1EG-0001/ keeps the Record ID.
-/1EG/:id/  https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx?p=:id  302
-/1EG/:id   https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx?p=:id  302
-
-# --- everything else under /1EG : Passport Landing, no Record ID ----------------
-# Covers /1EG/ (empty id) and nested paths such as /1EG/a/b — never fabricate an ID.
+# --- everything under /1EG that is NOT a single segment : Passport Landing -----
+# Covers /1EG/ (empty id) and nested paths such as /1EG/a/b/c — never fabricate an ID.
 /1EG/*     https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx  302
 /1EG       https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx  302
 
-# --- bare host and every other namespace : Passport Landing ---------------------
+# --- bare host and every other namespace : Passport Landing --------------------
 # Covers / and wrong namespaces such as /wrong/1EG-0001.
 /*         https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx  302
 
 # --- CUTOVER-ONLY canonicalisation — DO NOT ENABLE DURING STAGING ---------------
 # Enabling this while passport.greenglassvarano.com still points at GitHub Pages
-# would make the Pages staging deployment untestable: every *.pages.dev request
-# would 301 away to the old host. Uncomment ONLY at cutover, replacing <project>.
+# would make the Pages staging deployment untestable. Uncomment ONLY at cutover.
 #
 # https://<project>.pages.dev/*  https://passport.greenglassvarano.com/:splat  301

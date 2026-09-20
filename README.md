@@ -34,7 +34,21 @@ so is the SharePoint destination. None of them is the contract.
 - **Only the Record ID is preserved.** No inbound query string, tracking, session or
   user-specific parameter is forwarded.
 
-## Routing
+## Routing authority — split, deliberately
+
+| route | handled by |
+|---|---|
+| `/1EG/<one path segment>` | **`functions/1EG/[id].js`** — the Pages Function |
+| everything else | the rules in **`_redirects`** |
+
+Cloudflare applies a matching Pages Function ahead of `_redirects`, and **redirects
+declared in `_redirects` do not apply to a request served by a matching Function**. The
+Function therefore owns the dynamic Record-ID route outright; `_redirects` owns the
+static fallbacks and substitutes nothing.
+
+- The Function matches **one** segment after `/1EG/`. A trailing slash is accepted.
+- **Nested paths do not match** the single-segment Function and fall through to
+  `_redirects`, which sends them to the Landing — never a fabricated Record ID.
 
 | request | result | status |
 |---|---|---|
@@ -44,22 +58,54 @@ so is the SharePoint destination. None of them is the contract.
 | `/1EG/1EG-9999` | `…Passport.aspx?p=1EG-9999` (well-formed, absent) | 302 |
 | `/1EG/GARBAGE` | `…Passport.aspx?p=GARBAGE` (malformed, still forwarded) | 302 |
 | `/1EG/1EG-0001/` | `…Passport.aspx?p=1EG-0001` (trailing slash tolerated) | 302 |
-| `/1EG/1EG-0001?x=1` | `…Passport.aspx?p=1EG-0001` (stray query dropped) | 302 |
+| `/1EG/1EG-0001?utm_source=qr&sid=abc` | `…Passport.aspx?p=1EG-0001` (inbound query discarded) | 302 |
+| `/1EG/X&admin=1` | `…Passport.aspx?p=X%26admin%3D1` — **one** parameter | 302 |
 | `/1EG/`, `/1EG` | Passport Landing, no `?p=` | 302 |
 | `/` | Passport Landing | 302 |
 | `/wrong/1EG-0001` | Passport Landing (never a fabricated ID) | 302 |
-| `/1EG/a/b`, nested | Passport Landing (never a fabricated ID) | 302 |
+| `/1EG/a/b/c`, nested | Passport Landing (never a fabricated ID) | 302 |
 
 **No open redirect.** Every destination is a hard-coded absolute URL on
-`dbgroupcorp.sharepoint.com`. Nothing from the request reaches the destination host or
-path — the single substituted value, `:id`, lands only in the `?p=` query value.
+`dbgroupcorp.sharepoint.com`. Nothing from the request reaches the destination scheme,
+hostname or path — the Record ID lands only in the `p` query value, added through
+`URLSearchParams.set`, which encodes it.
+
+## Why the Pages Function exists — measured, not assumed
+
+`_redirects` alone was **proven insufficient on the real Cloudflare edge**. Cloudflare
+substitutes a captured placeholder **verbatim and unencoded**, so a raw query delimiter
+in the path escaped the intended `p` parameter:
+
+| request | `Location` produced by `_redirects` | parsed |
+|---|---|---|
+| `/1EG/X&admin=1` | `…Passport.aspx?p=X&admin=1` | `p=X` **and** `admin=1` |
+| `/1EG/1EG-0001&utm=x` | `…Passport.aspx?p=1EG-0001&utm=x` | `p=1EG-0001` **and** `utm=x` |
+| `/1EG/A&b&c` | `…Passport.aspx?p=A&b&c` | three parameters |
+
+The second row is the dangerous one: a **valid** Record ID still routed correctly while
+an attacker-chosen parameter rode along into the SharePoint request. Percent-encoded
+input was safe (`/1EG/X%26admin%3D1` stayed one parameter) because Cloudflare does not
+decode — the defect was specific to **raw** delimiters.
+
+`_redirects` has no way to encode a captured value, so the dynamic route moved to the
+Function, where the destination is built with the URL API. The two `:id` rules were
+**removed** from `_redirects`; CI fails if a `?p=` or `:placeholder` rule reappears.
+
+### Malformed percent-encoding — Cloudflare fails closed, and that is accepted
+
+Measured at the edge: `/1EG/%ZZ` returns **400**, `/1EG/%` returns **500**, and
+`/1EG/..%2F..%2Fevil.com` returns **400** — all rejected **before** any Function or
+redirect rule runs, with no `Location`. This is recorded as factual Cloudflare edge
+behaviour. **Failing closed is acceptable** and no attempt is made to bypass it; a
+damaged QR scan yields an error page rather than the Landing.
 
 ## Files
 
 | file | role |
 |---|---|
-| `_redirects` | **production** — Cloudflare Pages true-HTTP redirect rules |
-| `route-test.js` | `node route-test.js` — parses the shipped `_redirects` and asserts the contract |
+| `functions/1EG/[id].js` | **production** — Pages Function; sole authority for `/1EG/<RecordID>` |
+| `_redirects` | **production** — static fallbacks; substitutes nothing |
+| `route-test.js` | `node route-test.js` — **invokes** the shipped Function and parses the shipped `_redirects` |
 | `.github/workflows/redirect-tests.yml` | CI — runs the suite on every push and PR |
 | `index.html` | **rollback** — GitHub Pages bare host `/` → Landing |
 | `404.html` | **rollback** — GitHub Pages client-side `/1EG/<id>` → `?p=<id>` |
@@ -70,21 +116,18 @@ rollback implementation until HK09 closes. GitHub Pages ignores `_redirects`; Cl
 Pages ignores the HTML fallbacks because redirects are applied ahead of asset matching.
 Both can therefore coexist during the migration.
 
-## Staging acceptance — required before cutover
+## Staging acceptance — settled on the real edge
 
-Two Cloudflare behaviours are **undocumented** and cannot be settled offline. Probe both
-on the `*.pages.dev` staging deployment and record the results before any DNS change:
+Both previously undocumented behaviours were probed on a Cloudflare Pages preview and are
+now settled facts:
 
-1. **Inbound query strings must not leak.** Request `/1EG/1EG-0001?utm_source=qr&sid=abc`
-   and confirm the `Location` header is exactly
-   `…Passport.aspx?p=1EG-0001` — with no `utm_source`, no `sid`, and no second `?`.
-2. **Placeholder substitution must be encoded.** Request `/1EG/X%26admin%3D1` and
-   `/1EG/X&admin=1` and confirm the `Location` value keeps the payload inside the `p`
-   parameter rather than introducing a second query parameter.
+1. **Inbound query strings do not leak.** `/1EG/1EG-0001?utm_source=qr&sid=abc` produced
+   exactly `…Passport.aspx?p=1EG-0001` — no `utm_source`, no `sid`, no second `?`.
+2. **Placeholder substitution was NOT encoded** — this is what forced the Function. See
+   "Why the Pages Function exists" above.
 
-If either probe fails, `_redirects` alone is insufficient and the rule must move to a
-Pages Function or a Bulk Redirect rule. Do not cut over until both pass.
-
-Also confirm: `curl -sI` returns a real `HTTP/2 302` with a `Location` header (not an
-HTML page), and the cutover-only `pages.dev` canonicalisation in `_redirects` stays
-commented out until DNS actually moves.
+Before any DNS change, re-confirm on a preview deployment that
+`/1EG/1EG-0001&utm=x` yields a destination whose query parameters are exactly
+`p=1EG-0001&utm=x` and nothing else, and that `curl -sI` returns a real `HTTP/2 302`
+with a `Location` header rather than an HTML page. Keep the cutover-only `pages.dev`
+canonicalisation in `_redirects` commented out until DNS actually moves.

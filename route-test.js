@@ -1,160 +1,138 @@
 /*
  * 1EG Passport durable-URL redirect — routing-contract test (local, no network).
- * Project Blackbook PB-PP-1EG-ARCH-2026-09-08-02 / HK09 Phase 2A.
+ * Project Blackbook PB-PP-1EG-ARCH-2026-09-08-02 / HK09 Phase 2A.1.
  *
  * Run:  node route-test.js
  *
  * WHAT THIS PROVES
- *   It parses the SHIPPED `_redirects` file and evaluates it with Cloudflare
- *   Pages matching semantics (first match wins; `:name` matches exactly one
- *   non-empty path segment; `*` matches greedily including empty). The rule
- *   table and the tests therefore cannot drift apart.
+ *   1. It loads the SHIPPED `functions/1EG/[id].js` and INVOKES it, then parses the
+ *      real `Location` of the Response it returns. The single-segment Record ID
+ *      route is therefore tested as code, not as a model of code.
+ *   2. It parses the SHIPPED `_redirects` and evaluates the remaining fallback
+ *      rules with Cloudflare matching semantics.
+ *   Neither the Function nor the rule table can drift away from these tests.
  *
- * WHAT THIS DOES NOT PROVE
- *   That Cloudflare's edge implements those semantics identically, and in
- *   particular (a) whether an inbound query string is appended to a destination
- *   that already carries one, and (b) whether a placeholder value is
- *   percent-encoded on substitution. Both are UNDOCUMENTED and must be probed
- *   on the staging deployment before cutover. See README "Staging acceptance".
+ * WHY THE FUNCTION EXISTS — see functions/1EG/[id].js. `_redirects` substitutes a
+ * captured placeholder verbatim and unencoded, so a raw `&` in the path escaped
+ * the `p` parameter on the real Cloudflare edge.
  */
 "use strict";
 
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 
 const DEST_ORIGIN = "https://dbgroupcorp.sharepoint.com";
-const LANDING = DEST_ORIGIN + "/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx";
+const DEST_PATH = "/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx";
+const LANDING = DEST_ORIGIN + DEST_PATH;
 
-// ---------- parse the shipped _redirects ----------
-function parseRedirects(file) {
-  return fs.readFileSync(file, "utf8")
-    .split("\n")
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith("#"))
-    .map(l => {
-      const [from, to, code] = l.split(/\s+/);
-      return { from, to, code: Number(code || 302) };
-    });
+let fail = 0;
+const ok = (cond, label, detail) => {
+  if (!cond) fail++;
+  console.log(`${cond ? "PASS" : "FAIL"}  ${label}${detail ? "\n      " + detail : ""}`);
+};
+
+// ---------- load the SHIPPED Pages Function and invoke it ----------
+// The file is an ES module (Cloudflare requires it). Strip the `export` keyword so
+// it can be evaluated here without a package.json "type" change that would alter
+// how Cloudflare's build treats the project.
+function loadOnRequest() {
+  const src = fs.readFileSync(path.join(__dirname, "functions", "1EG", "[id].js"), "utf8");
+  const ctx = { URL, URLSearchParams, Response, String, module: {} };
+  vm.createContext(ctx);
+  vm.runInContext(src.replace(/^\s*export\s+function\s+onRequest/m, "function onRequest") +
+                  "\nmodule.onRequest = onRequest;", ctx);
+  return ctx.module.onRequest;
+}
+const onRequest = loadOnRequest();
+
+const locationOf = res => res.headers.get("location");
+
+// ---------- the Record IDs the Function must contain inside a single `p` ----------
+const IDS = [
+  "1EG-0001", "1EG-C-0001", "1eg-0001", "1eg-c-0001", "1EG-9999", "GARBAGE",
+  "X&admin=1", "1EG-0001&utm=x", "A&b&c", "X=admin", "X?admin=1",
+  "X%26admin%3D1", "..%2f..%2fevil.com", "@evil.com", "https://evil.com", "%2e%2e%2f",
+];
+
+console.log("=== Pages Function — single-segment Record ID ===");
+for (const id of IDS) {
+  const loc = locationOf(onRequest({ params: { id } }));
+  const u = new URL(loc);
+  const keys = [...u.searchParams.keys()];
+  const good =
+    u.protocol === "https:" &&
+    u.hostname === "dbgroupcorp.sharepoint.com" &&
+    u.pathname === DEST_PATH &&
+    keys.length === 1 &&
+    keys[0] === "p" &&
+    u.searchParams.get("p") === id;
+  ok(good, `id=${JSON.stringify(id)}`,
+     `-> ${loc}\n      params=${JSON.stringify([...u.searchParams.entries()])}`);
 }
 
-// ---------- Cloudflare Pages matching semantics ----------
+console.log("\n=== Function invariants ===");
+{
+  const loc = locationOf(onRequest({ params: { id: "1EG-0001&utm=x" } }));
+  const u = new URL(loc);
+  ok(!u.searchParams.has("utm"), "a raw & in the Record ID cannot create a second parameter",
+     `params=${JSON.stringify([...u.searchParams.entries()])}`);
+  ok([...u.searchParams.keys()].length === 1, "exactly one destination query parameter");
+}
+{
+  // Inbound query strings are discarded: the Function never reads request.url.
+  const src = fs.readFileSync(path.join(__dirname, "functions", "1EG", "[id].js"), "utf8");
+  ok(!/context\.request|request\.url|\.search\b/.test(src),
+     "the Function never reads the inbound request URL or its query string");
+  ok(!/\+\s*["'`]\?p=|`.*\$\{.*\}.*\?p=/.test(src),
+     "the Record ID is never concatenated into a query string");
+  const hosts = src.match(/https?:\/\/[^"'\s]+/g) || [];
+  ok(hosts.every(h => h.startsWith(DEST_ORIGIN + "/sites/1EG-PreservedItemCatalogue")),
+     "every URL literal in the Function is the governed SharePoint destination");
+  ok(/Response\.redirect\([^,]+,\s*302\s*\)/.test(src), "the Function issues a genuine 302");
+}
+
+// ---------- the SHIPPED _redirects fallbacks ----------
+function parseRedirects(file) {
+  return fs.readFileSync(file, "utf8").split("\n").map(l => l.trim())
+    .filter(l => l && !l.startsWith("#"))
+    .map(l => { const [from, to, code] = l.split(/\s+/); return { from, to, code: Number(code || 302) }; });
+}
 function matchRule(rulePath, reqPath) {
   const star = rulePath.indexOf("*");
   if (star !== -1) {
     const prefix = rulePath.slice(0, star);
-    return reqPath.startsWith(prefix) ? { splat: reqPath.slice(prefix.length) } : null;
+    return reqPath.startsWith(prefix) ? {} : null;
   }
-  const rp = rulePath.split("/"), qp = reqPath.split("/");
-  if (rp.length !== qp.length) return null;
-  const vars = {};
-  for (let i = 0; i < rp.length; i++) {
-    if (rp[i].startsWith(":")) {
-      if (qp[i] === "") return null;            // a placeholder never matches an empty segment
-      vars[rp[i].slice(1)] = qp[i];
-    } else if (rp[i] !== qp[i]) return null;
-  }
-  return vars;
+  return rulePath === reqPath ? {} : null;
 }
-
-function resolve(reqUrl, rules) {
-  let reqPath;
-  try { reqPath = new URL(reqUrl, "https://passport.greenglassvarano.com").pathname; }
-  catch { reqPath = reqUrl.startsWith("/") ? reqUrl : "/" + reqUrl; }
-  for (const r of rules) {
-    const vars = matchRule(r.from, reqPath);
-    if (!vars) continue;
-    let to = r.to;
-    for (const [k, v] of Object.entries(vars)) to = to.split(":" + k).join(v);
-    return { to, code: r.code };
-  }
+function resolveFallback(reqPath, rules) {
+  for (const r of rules) if (matchRule(r.from, reqPath)) return r;
   return null;
 }
 
-const paramOf = u => { const i = u.indexOf("?p="); return i === -1 ? "" : u.slice(i + 3); };
-
-// ---------- what the SPFx page then does with ?p= (mirrors classifyRecordId) ----------
-function classify(raw) {
-  const id = (raw || "").trim().toUpperCase();
-  if (!id) return "landing";
-  if (id.indexOf("1EG-C-") === 0) return "container";
-  if (id.indexOf("1EG-") === 0) return "item";
-  return "not-found";
-}
-
-// ---------- cases: [request, expected ?p=, expected screen, expected status] ----------
-const CASES = [
-  ["/1EG/1EG-0001",            "1EG-0001",   "item",      302],
-  ["/1EG/1EG-0002",            "1EG-0002",   "item",      302],
-  ["/1EG/1EG-C-0001",          "1EG-C-0001", "container", 302],
-  ["/1EG/1eg-0001",            "1eg-0001",   "item",      302],  // case preserved verbatim; SPFx upper-cases
-  ["/1EG/1eg-c-0001",          "1eg-c-0001", "container", 302],
-  ["/1EG/1EG-0125",            "1EG-0125",   "item",      302],
-  ["/1EG/1EG-9999",            "1EG-9999",   "item",      302],  // well-formed, absent -> SPFx "not found"
-  ["/1EG/GARBAGE",             "GARBAGE",    "not-found", 302],  // malformed id still forwarded (dumb host)
-  ["/1EG/1EG-0001/",           "1EG-0001",   "item",      302],  // trailing slash keeps the id
-  ["/1EG/1EG-0001?x=1",        "1EG-0001",   "item",      302],  // stray query dropped by the rule table
-  ["/1EG/1EG-0001?utm_source=qr&sid=abc", "1EG-0001", "item", 302],
-  ["/1EG/",                    "",           "landing",   302],
-  ["/1EG",                     "",           "landing",   302],
-  ["/",                        "",           "landing",   302],
-  ["/wrong/1EG-0001",          "",           "landing",   302],  // wrong namespace -> Landing
-  ["/1EG/1EG-0001/extra",      "",           "landing",   302],  // nested -> Landing, never a fabricated id
-  ["/1EG/a/b/c",               "",           "landing",   302],
-  ["/1EG/%ZZ",                 "%ZZ",        "not-found", 302],  // malformed percent-encoding forwarded verbatim
-  ["/1EG/%2e%2e%2f",           "%2e%2e%2f",  "not-found", 302],
-  ["/anything/else",           "",           "landing",   302],
-];
-
 const rules = parseRedirects(path.join(__dirname, "_redirects"));
-let fail = 0;
 
-for (const [req, wantParam, wantScreen, wantCode] of CASES) {
-  const r = resolve(req, rules);
-  const dest = r ? r.to : "(no rule matched)";
-  const gotParam = r ? paramOf(dest) : "";
-  const gotScreen = dest.includes("?p=") ? classify(gotParam) : "landing";
-  const ok = !!r && gotParam === wantParam && gotScreen === wantScreen && r.code === wantCode
-             && dest.startsWith(DEST_ORIGIN + "/");
-  if (!ok) fail++;
-  console.log(`${ok ? "PASS" : "FAIL"}  ${req}\n      -> ${dest}  [${r ? r.code : "-"}]\n      ?p="${gotParam}" (want "${wantParam}")  screen=${gotScreen} (want ${wantScreen})`);
+console.log("\n=== _redirects fallbacks (Landing, never a fabricated ID) ===");
+for (const p of ["/1EG/", "/1EG", "/", "/wrong/1EG-0001", "/1EG/a/b/c", "/anything/else"]) {
+  const r = resolveFallback(p, rules);
+  ok(!!r && r.to === LANDING && r.code === 302, `${p} -> Landing, no ?p=`,
+     r ? `-> ${r.to} [${r.code}]` : "(no rule matched)");
 }
 
-// ---------- invariants over the whole shipped rule table ----------
-function inv(name, cond) {
-  if (!cond) fail++;
-  console.log(`${cond ? "PASS" : "FAIL"}  INVARIANT  ${name}`);
-}
+console.log("\n=== _redirects whole-table invariants ===");
+ok(rules.every(r => r.to === LANDING), "every remaining rule is the bare Landing URL");
+ok(rules.every(r => !r.to.includes("?")), "no remaining rule produces a query string at all");
+ok(rules.every(r => !/:\w/.test(r.from) && !/:\w/.test(r.to.replace(/^https:/, ""))),
+   "NO remaining rule substitutes a captured placeholder");
+ok(rules.every(r => !r.to.includes(":splat")), "no remaining rule forwards a splat");
+ok(rules.every(r => r.code === 302), "the backend hop is 302, never 301");
+ok(!rules.some(r => r.from.includes("pages.dev") || r.to.includes("pages.dev")),
+   "the cutover-only pages.dev canonicalisation is NOT active");
+ok(!fs.readFileSync(path.join(__dirname, "_redirects"), "utf8")
+     .split("\n").filter(l => l.trim() && !l.trim().startsWith("#"))
+     .some(l => /\?p=/.test(l)),
+   "no ?p= rule remains in _redirects — the Function is the sole Record-ID authority");
 
-inv("every rule redirects to the governed SharePoint origin",
-    rules.every(r => r.to.startsWith(DEST_ORIGIN + "/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx")));
-inv("no destination host contains a placeholder or splat (no open redirect)",
-    rules.every(r => !/^https?:\/\/[^/]*(:[A-Za-z_]|\*)/.test(r.to)));
-inv("the backend hop is 302, never 301",
-    rules.every(r => r.code === 302));
-inv("the only substituted value is :id, and only in the ?p= query value",
-    rules.every(r => { const q = r.to.indexOf("?"); const before = q === -1 ? r.to : r.to.slice(0, q);
-                       return !before.includes(":") || before.startsWith("https:"); }));
-inv("no rule forwards an inbound query string",
-    rules.every(r => !r.to.includes(":splat") && (r.to.match(/\?/g) || []).length <= 1));
-inv("no tracking/session parameter appears in any destination",
-    rules.every(r => !/utm_|sid=|session|token|fbclid|gclid/i.test(r.to)));
-inv("landing destinations carry no query string at all",
-    rules.filter(r => !r.to.includes("?p=")).every(r => r.to === LANDING));
-inv("the cutover-only pages.dev canonicalisation is NOT active",
-    !rules.some(r => r.from.includes("pages.dev") || r.to.includes("pages.dev")));
-
-// ---------- the destination host cannot be influenced by the request ----------
-const HOSTILE = [
-  "/1EG/..%2f..%2fevil.com", "/1EG/https:%2f%2fevil.com", "/1EG/@evil.com",
-  "/\\evil.com", "//evil.com", "/1EG/%00", "/1EG/.%2e/%2e%2e",
-];
-for (const h of HOSTILE) {
-  const r = resolve(h, rules);
-  const ok = !!r && new URL(r.to).host === "dbgroupcorp.sharepoint.com";
-  if (!ok) fail++;
-  console.log(`${ok ? "PASS" : "FAIL"}  HOSTILE  ${h}\n      -> host=${r ? new URL(r.to).host : "(none)"} (must be dbgroupcorp.sharepoint.com)`);
-}
-
-const total = CASES.length + 8 + HOSTILE.length;
-console.log(fail === 0 ? `\nALL ${total} CHECKS PASS` : `\n${fail} FAILURE(S) of ${total}`);
+console.log(fail === 0 ? `\nALL CHECKS PASS` : `\n${fail} FAILURE(S)`);
 process.exit(fail === 0 ? 0 : 1);

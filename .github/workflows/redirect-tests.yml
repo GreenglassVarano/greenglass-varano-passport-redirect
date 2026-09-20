@@ -1,9 +1,10 @@
 # 1EG Passport redirect host — routing-contract tests.
-# Project Blackbook HK09 Phase 2A.
+# Project Blackbook HK09 Phase 2A / 2A.1.
 #
-# Runs the deterministic, offline routing-contract suite against the SHIPPED
-# `_redirects` file on every push and pull request, so the rule table and its
-# tests cannot drift apart. No network, no secrets, no deployment.
+# Runs the deterministic, offline routing-contract suite on every push and pull
+# request. The suite loads and INVOKES the shipped Pages Function and parses the
+# shipped `_redirects`, so neither can drift away from its tests.
+# No network, no secrets, no deployment.
 name: Redirect contract tests
 
 on:
@@ -24,8 +25,22 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Routing contract (parses _redirects, asserts the governed behaviour)
+      - name: Routing contract (invokes the Function, parses _redirects)
         run: node route-test.js
+
+      - name: The Pages Function must be the sole Record-ID authority
+        run: |
+          set -e
+          test -f "functions/1EG/[id].js" || { echo "::error::functions/1EG/[id].js is missing"; exit 1; }
+          if grep -vE '^\s*#|^\s*$' _redirects | grep -q '?p='; then
+            echo "::error::a ?p= rule reappeared in _redirects — the Function must own the Record-ID route"
+            exit 1
+          fi
+          if grep -vE '^\s*#|^\s*$' _redirects | grep -qE '(^|[[:space:]])/[^[:space:]]*:[A-Za-z_]'; then
+            echo "::error::a :placeholder rule reappeared in _redirects"
+            exit 1
+          fi
+          echo "Function present; _redirects carries no dynamic Record-ID rule"
 
       - name: Rollback files must remain intact until HK09 closes
         run: |
