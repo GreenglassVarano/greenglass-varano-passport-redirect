@@ -1,0 +1,62 @@
+# 1EG Passport redirect host — routing-contract tests.
+# Project Blackbook HK09 Phase 2A / 2A.1.
+#
+# Runs the deterministic, offline routing-contract suite on every push and pull
+# request. The suite loads and INVOKES the shipped Pages Function and parses the
+# shipped `_redirects`, so neither can drift away from its tests.
+# No network, no secrets, no deployment.
+name: Redirect contract tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  route-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Routing contract (invokes the Function, parses _redirects)
+        run: node route-test.js
+
+      - name: The Pages Function must be the sole Record-ID authority
+        run: |
+          set -e
+          test -f "functions/1EG/[id].js" || { echo "::error::functions/1EG/[id].js is missing"; exit 1; }
+          if grep -vE '^\s*#|^\s*$' _redirects | grep -q '?p='; then
+            echo "::error::a ?p= rule reappeared in _redirects — the Function must own the Record-ID route"
+            exit 1
+          fi
+          if grep -vE '^\s*#|^\s*$' _redirects | grep -qE '(^|[[:space:]])/[^[:space:]]*:[A-Za-z_]'; then
+            echo "::error::a :placeholder rule reappeared in _redirects"
+            exit 1
+          fi
+          echo "Function present; _redirects carries no dynamic Record-ID rule"
+
+      - name: Rollback files must remain intact until HK09 closes
+        run: |
+          set -e
+          for f in index.html 404.html CNAME; do
+            test -f "$f" || { echo "::error::rollback file $f is missing"; exit 1; }
+          done
+          echo "index.html, 404.html and CNAME are present"
+
+      - name: CNAME must remain the durable public identity
+        run: |
+          set -e
+          expected="passport.greenglassvarano.com"
+          actual="$(tr -d '[:space:]' < CNAME)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::CNAME is '$actual', expected '$expected'"
+            exit 1
+          fi
+          echo "CNAME = $actual"
