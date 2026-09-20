@@ -91,13 +91,32 @@ decode — the defect was specific to **raw** delimiters.
 Function, where the destination is built with the URL API. The two `:id` rules were
 **removed** from `_redirects`; CI fails if a `?p=` or `:placeholder` rule reappears.
 
-### Malformed percent-encoding — Cloudflare fails closed, and that is accepted
+### Malformed percent-encoding — measured on the real edge
 
-Measured at the edge: `/1EG/%ZZ` returns **400**, `/1EG/%` returns **500**, and
-`/1EG/..%2F..%2Fevil.com` returns **400** — all rejected **before** any Function or
-redirect rule runs, with no `Location`. This is recorded as factual Cloudflare edge
-behaviour. **Failing closed is acceptable** and no attempt is made to bypass it; a
-damaged QR scan yields an error page rather than the Landing.
+Behaviour **differs between the two implementations**, so the two are recorded
+separately. Both were measured; neither is inferred.
+
+**Phase 2A / pre-Function behaviour** (`_redirects` owned the Record-ID route):
+
+| request | result |
+|---|---|
+| `/1EG/%ZZ` | **400**, no `Location` |
+| `/1EG/%` | **500**, no `Location` |
+| `/1EG/..%2F..%2Fevil.com` | **400**, no `Location` |
+
+**Phase 2A.1 / current Function behaviour** — this is the behaviour that ships:
+
+| request | result |
+|---|---|
+| `/1EG/%ZZ` | **400**, no `Location` — rejected by the edge before the Function runs |
+| `/1EG/..%2F..%2Fevil.com` | **400**, no `Location` — rejected by the edge before the Function runs |
+| **`/1EG/%`** | **302** → `…Passport.aspx?p=%25`, parsed **`p = %`** — the Function handles it cleanly |
+
+So the Function *improved* one case: the bare `%` that previously produced a 500 now
+produces a normal single-parameter redirect. The two genuinely malformed escapes are
+still rejected by Cloudflare **before** any Function or redirect rule runs. **Failing
+closed is acceptable** and no attempt is made to bypass it; a damaged QR scan yields an
+error page rather than the Landing.
 
 ## Files
 
