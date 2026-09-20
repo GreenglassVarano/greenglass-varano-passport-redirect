@@ -23,9 +23,10 @@ so is the SharePoint destination. None of them is the contract.
 
 - **The backend SharePoint hop is `302`, never `301`.** The hostname is permanent; the
   SharePoint URL is not. A cacheable permanent redirect would burn today's backend into
-  clients that already scanned a code, and weaken future portability. `301` is reserved
-  for canonicalising an *alternate hosting* hostname (e.g. `<project>.pages.dev`) onto
-  the durable one.
+  clients that already scanned a code, and weaken future portability. **No rule in this
+  repository uses `301`** — canonicalising the Cloudflare-generated hostname onto the
+  durable one is a hostname-level redirect and is handled outside this repository
+  (see "Canonicalising the pages.dev hostname").
 - **Changing the backend requires no QR regeneration.** Only `_redirects` changes.
 - **Batch 002 URLs remain unchanged**, and remain valid across this migration.
 - **The host holds no data** and is **deliberately dumb**: it does not check whether a
@@ -148,5 +149,27 @@ now settled facts:
 Before any DNS change, re-confirm on a preview deployment that
 `/1EG/1EG-0001&utm=x` yields a destination whose query parameters are exactly
 `p=1EG-0001&utm=x` and nothing else, and that `curl -sI` returns a real `HTTP/2 302`
-with a `Location` header rather than an HTML page. Keep the cutover-only `pages.dev`
-canonicalisation in `_redirects` commented out until DNS actually moves.
+with a `Location` header rather than an HTML page.
+
+## Canonicalising the `pages.dev` hostname — NOT done in this repository
+
+**Cloudflare Pages `_redirects` matches paths only. It cannot match on hostname**, so
+`greenglass-varano-passport-redirect.pages.dev` → `passport.greenglassvarano.com`
+**cannot** be expressed in `_redirects`. An earlier revision of this repository carried a
+commented-out example implying it could; that was wrong and has been removed.
+
+The supported mechanism is an account-level **Cloudflare Bulk Redirect**:
+
+| field | value |
+|---|---|
+| source hostname | `greenglass-varano-passport-redirect.pages.dev` |
+| destination | `https://passport.greenglassvarano.com` |
+| status | **301** |
+| options | preserve path suffix · preserve query string · subpath matching |
+
+**Intent:** canonicalise the Cloudflare-generated production hostname onto the permanent
+public hostname, so only the durable URL is ever indexed or shared.
+
+It is created in the **Cloudflare dashboard, not in this repository**, and only **after**
+the durable custom domain has successfully cut over and passed acceptance testing. It
+does not exist yet.
