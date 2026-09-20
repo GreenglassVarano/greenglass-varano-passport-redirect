@@ -20,7 +20,9 @@
 #   302 for the durable-host -> current-SharePoint hop. NEVER 301. The hostname is
 #       permanent; the SharePoint URL is not, and a cacheable permanent redirect
 #       would weaken future portability.
-#   301 only to canonicalise an ALTERNATE HOSTING hostname onto the durable one.
+#   301 is NOT used in this file at all. Canonicalising the Cloudflare-generated
+#       hostname onto the durable one is a HOSTNAME-level redirect, which this file
+#       cannot express — see the note at the end.
 #
 # ORDER MATTERS — first match wins.
 
@@ -33,8 +35,20 @@
 # Covers / and wrong namespaces such as /wrong/1EG-0001.
 /*         https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx  302
 
-# --- CUTOVER-ONLY canonicalisation — DO NOT ENABLE DURING STAGING ---------------
-# Enabling this while passport.greenglassvarano.com still points at GitHub Pages
-# would make the Pages staging deployment untestable. Uncomment ONLY at cutover.
+# --- HOSTNAME-LEVEL CANONICALISATION IS NOT HANDLED HERE -----------------------
 #
-# https://<project>.pages.dev/*  https://passport.greenglassvarano.com/:splat  301
+# Cloudflare Pages `_redirects` matches PATHS ONLY. It cannot match on hostname, so
+# canonicalising the Cloudflare-generated production hostname onto the permanent
+# public hostname CANNOT be expressed in this file. An earlier revision carried a
+# commented example that implied otherwise; it was wrong and has been removed so it
+# can never be uncommented in good faith.
+#
+# The supported mechanism is an account-level CLOUDFLARE BULK REDIRECT:
+#
+#     source hostname : greenglass-varano-passport-redirect.pages.dev
+#     destination     : https://passport.greenglassvarano.com
+#     status          : 301
+#     options         : preserve path suffix, preserve query string, subpath matching
+#
+# It is created in the Cloudflare dashboard, NOT in this repository, and only AFTER
+# the durable custom domain has cut over and passed acceptance testing.
