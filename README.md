@@ -8,8 +8,19 @@ to the current SharePoint Passport destination
 
     https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx?p=<RecordID>
 
-Project Blackbook: `PB-PP-1EG-ARCH-2026-09-08-02` / `PB-PP-1EG-ICR-2026-09-08-02`, HK09.
-Governing repo: `GreenglassVarano/greenglass-varano-preconstruction-kb` (private).
+## Product boundary
+
+This repository is **Project Passport implementation infrastructure**, not part of the Project Blackbook Operating System.
+
+Project Blackbook remains the canonical Greenglass Varano authority for brand/visual compliance, governance standards, case-study knowledge, tender/scope intelligence and Blackbook Operating System documents. Passport consumes those standards; it does not redefine them.
+
+Historical implementation provenance remains recorded in Project Blackbook as `PB-PP-1EG-ARCH-2026-09-08-02` / `PB-PP-1EG-ICR-2026-09-08-02`, HK09. Those records are retained as durable evidence of how the 1EG implementation was built.
+
+Blackbook governing standards repository: `GreenglassVarano/greenglass-varano-preconstruction-kb` (private).
+
+Project Passport's reusable domain is inventory identity, item/container records, durable QR/deep-link routing, location/status/custody history, publication/read-model patterns and project-specific or company-wide asset inventory applications.
+
+Project Handshake may reuse selected Passport infrastructure such as durable QR IDs, redirect/deep-link patterns and permission-aware views, while remaining a separate people/access/contact product.
 
 ## The contract
 
