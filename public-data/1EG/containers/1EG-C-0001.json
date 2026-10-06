@@ -1,0 +1,25 @@
+{
+  "schema": "project-passport/public-container@1",
+  "project": "1EG",
+  "recordId": "1EG-C-0001",
+  "kind": "container",
+  "fields": {
+    "ContainerType": "Cardboard Box",
+    "ContainerDescription": null,
+    "ContainerStatusExternal": "Preparing",
+    "ContainerCondition": "Good"
+  },
+  "contents": [
+    {
+      "recordId": "1EG-0001",
+      "itemName": "Coffee cup",
+      "thumb": "/public-media/1EG/1EG-0001/1EG-0001-01-thumb.jpg"
+    },
+    {
+      "recordId": "1EG-0002",
+      "itemName": "Kirkland Water Bottle",
+      "thumb": "/public-media/1EG/1EG-0002/1EG-0002-01-thumb.jpg"
+    }
+  ],
+  "media": []
+}

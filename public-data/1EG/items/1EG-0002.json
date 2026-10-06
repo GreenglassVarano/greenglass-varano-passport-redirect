@@ -1,0 +1,45 @@
+{
+  "schema": "project-passport/public-item@1",
+  "project": "1EG",
+  "recordId": "1EG-0002",
+  "kind": "item",
+  "fields": {
+    "ContainerRef": "1EG-C-0001",
+    "ItemName": "Kirkland Water Bottle",
+    "ShortDescription": "Empty Platsix Waterbottle",
+    "ItemClass": "Unclassified",
+    "ItemType": null,
+    "OriginFloor": null,
+    "OriginRoom": null,
+    "OriginSubLocation": null,
+    "Period": null,
+    "Maker": null,
+    "Significance": "Review Required",
+    "PreservationRationale": null,
+    "IntendedDisposition": null,
+    "LifecycleStatus": null,
+    "PhysicalState": null,
+    "ConditionGrade": null,
+    "ConditionNarrative": null,
+    "DamageSummary": null,
+    "FinalInstalledLocation": null
+  },
+  "media": [
+    {
+      "type": "image",
+      "mediaType": "image/jpeg",
+      "src": "/public-media/1EG/1EG-0002/1EG-0002-01.jpg",
+      "width": 3000,
+      "height": 4000,
+      "bytes": 2185106,
+      "sha256": "266405bc7c158df1435e9a923c5c9cc58baa3f626d3ae1e446a6b6d8b891eb08",
+      "thumb": {
+        "src": "/public-media/1EG/1EG-0002/1EG-0002-01-thumb.jpg",
+        "width": 480,
+        "height": 640,
+        "bytes": 46434,
+        "sha256": "3c1dcbc1a3afc2cfb9019a8d2ca8db4e1e3bc622d8bceb79d2bf5440147901c6"
+      }
+    }
+  ]
+}

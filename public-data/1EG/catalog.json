@@ -1,0 +1,28 @@
+{
+  "schema": "project-passport/public-catalog@1",
+  "project": "1EG",
+  "projectName": "1 Edmund Gate",
+  "records": [
+    {
+      "recordId": "1EG-0001",
+      "kind": "item",
+      "title": "Coffee cup",
+      "summary": "Coffee cup used",
+      "thumb": "/public-media/1EG/1EG-0001/1EG-0001-01-thumb.jpg"
+    },
+    {
+      "recordId": "1EG-0002",
+      "kind": "item",
+      "title": "Kirkland Water Bottle",
+      "summary": "Empty Platsix Waterbottle",
+      "thumb": "/public-media/1EG/1EG-0002/1EG-0002-01-thumb.jpg"
+    },
+    {
+      "recordId": "1EG-C-0001",
+      "kind": "container",
+      "title": "Cardboard Box",
+      "summary": "Preparing",
+      "thumb": null
+    }
+  ]
+}

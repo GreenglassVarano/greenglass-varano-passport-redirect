@@ -1,0 +1,70 @@
+{
+  "schema": "project-passport/public-item@1",
+  "project": "1EG",
+  "recordId": "1EG-0001",
+  "kind": "item",
+  "fields": {
+    "ContainerRef": "1EG-C-0001",
+    "ItemName": "Coffee cup",
+    "ShortDescription": "Coffee cup used",
+    "ItemClass": "Unclassified",
+    "ItemType": null,
+    "OriginFloor": null,
+    "OriginRoom": null,
+    "OriginSubLocation": null,
+    "Period": null,
+    "Maker": null,
+    "Significance": "Review Required",
+    "PreservationRationale": null,
+    "IntendedDisposition": null,
+    "LifecycleStatus": null,
+    "PhysicalState": null,
+    "ConditionGrade": null,
+    "ConditionNarrative": null,
+    "DamageSummary": null,
+    "FinalInstalledLocation": null
+  },
+  "media": [
+    {
+      "type": "image",
+      "mediaType": "image/jpeg",
+      "src": "/public-media/1EG/1EG-0001/1EG-0001-01.jpg",
+      "width": 3000,
+      "height": 4000,
+      "bytes": 2374057,
+      "sha256": "286a0f17c261554a1f7943d016da2cebaaed5da31aa3a0498dbec5a40e30748c",
+      "thumb": {
+        "src": "/public-media/1EG/1EG-0001/1EG-0001-01-thumb.jpg",
+        "width": 480,
+        "height": 640,
+        "bytes": 55078,
+        "sha256": "8272eea6da46f99f868f662d07259ef6b8dd81c228e84c937026048a77754cc2"
+      }
+    },
+    {
+      "type": "image",
+      "mediaType": "image/jpeg",
+      "src": "/public-media/1EG/1EG-0001/1EG-0001-02.jpg",
+      "width": 3000,
+      "height": 4000,
+      "bytes": 2391461,
+      "sha256": "784aebe2952f23aa1f55bf294a608a23e1c96c8f09d21a51035ca809a88ee210",
+      "thumb": {
+        "src": "/public-media/1EG/1EG-0001/1EG-0001-02-thumb.jpg",
+        "width": 480,
+        "height": 640,
+        "bytes": 46531,
+        "sha256": "324c1f9e5407c52cbaa4548b7b42c41a3a59ae31feabf2fa010324db83632b1a"
+      }
+    },
+    {
+      "type": "video",
+      "mediaType": "video/mp4",
+      "src": "/public-media/1EG/1EG-0001/1EG-0001-04.mp4",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 8325332,
+      "sha256": "55ce73b47ddf92217bb952d95b5475b51d0997c201eb9bd67dec0710ba75df88"
+    }
+  ]
+}
