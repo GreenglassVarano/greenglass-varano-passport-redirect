@@ -10,7 +10,7 @@
     "publishedSnapshotSha256": "08bc3d0b3e7e06ee8bbc5c07462a1efc5b5eb1d2a3a252655c51f647e88eee77",
     "publishedSnapshotCapturedUtc": "2026-10-06T00:40:00Z",
     "issuedIdentitiesSha256": "74ff8274c144be0eafccfaa88dc77fe6b99a88e1f83ace057ed1973f077c34d3",
-    "mediaApprovalsSha256": "766346115cf52d78f9e866a459af660fa600a1b5407cddeb97a8dc919df3f4bf",
+    "mediaApprovalsSha256": "de7ffbd27135a1549bcf70bb3ffc9c5208865627dd81670d5b76394f966eb80a",
     "publisherProjectionSha256": "78134836cea003fbe07558992bd2052254ce3caa126f03046e89b2dee0d9ce6e"
   },
   "policy": {
@@ -82,13 +82,18 @@
     },
     {
       "path": "public-data/1EG/items/1EG-0001.json",
-      "bytes": 2042,
-      "sha256": "5eaf9cbd36c32f7690a582a944e0fbe97123b2b0b6f0fd1a184e524b4ecb95ec"
+      "bytes": 2550,
+      "sha256": "18ada48b54e2a452ab5e074d4e1a5b26cdcecdb1794323e382451ce301c2059b"
     },
     {
       "path": "public-data/1EG/items/1EG-0002.json",
-      "bytes": 1261,
-      "sha256": "c07df0ad7db3bda3e31705062df029daef3a28a58625f4486abec7d222094806"
+      "bytes": 1515,
+      "sha256": "b627c121b32fa823a81da592f8938e5b8bbaeaeac7a7d80ae38312464a341b58"
+    },
+    {
+      "path": "public-media/1EG/1EG-0001/1EG-0001-01-display.jpg",
+      "bytes": 290372,
+      "sha256": "c087366e43d20552d613988092701993862c48b6a1d89be8b7e267261c82b44b"
     },
     {
       "path": "public-media/1EG/1EG-0001/1EG-0001-01-thumb.jpg",
@@ -99,6 +104,11 @@
       "path": "public-media/1EG/1EG-0001/1EG-0001-01.jpg",
       "bytes": 2374057,
       "sha256": "286a0f17c261554a1f7943d016da2cebaaed5da31aa3a0498dbec5a40e30748c"
+    },
+    {
+      "path": "public-media/1EG/1EG-0001/1EG-0001-02-display.jpg",
+      "bytes": 241432,
+      "sha256": "83f8f7fe8bb5b53f98afe7eec9e0a015fc3ab166c71ce6bd89771a7a480b4052"
     },
     {
       "path": "public-media/1EG/1EG-0001/1EG-0001-02-thumb.jpg",
@@ -114,6 +124,11 @@
       "path": "public-media/1EG/1EG-0001/1EG-0001-04.mp4",
       "bytes": 8325332,
       "sha256": "55ce73b47ddf92217bb952d95b5475b51d0997c201eb9bd67dec0710ba75df88"
+    },
+    {
+      "path": "public-media/1EG/1EG-0002/1EG-0002-01-display.jpg",
+      "bytes": 218151,
+      "sha256": "2ec8e9ac8e727dfcdf999358c6f1243f6d27faa95d208d26a420617c00414b5d"
     },
     {
       "path": "public-media/1EG/1EG-0002/1EG-0002-01-thumb.jpg",

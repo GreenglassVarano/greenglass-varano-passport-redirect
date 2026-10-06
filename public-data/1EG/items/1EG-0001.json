@@ -39,6 +39,13 @@
         "height": 640,
         "bytes": 55078,
         "sha256": "8272eea6da46f99f868f662d07259ef6b8dd81c228e84c937026048a77754cc2"
+      },
+      "display": {
+        "src": "/public-media/1EG/1EG-0001/1EG-0001-01-display.jpg",
+        "width": 1200,
+        "height": 1600,
+        "bytes": 290372,
+        "sha256": "c087366e43d20552d613988092701993862c48b6a1d89be8b7e267261c82b44b"
       }
     },
     {
@@ -55,6 +62,13 @@
         "height": 640,
         "bytes": 46531,
         "sha256": "324c1f9e5407c52cbaa4548b7b42c41a3a59ae31feabf2fa010324db83632b1a"
+      },
+      "display": {
+        "src": "/public-media/1EG/1EG-0001/1EG-0001-02-display.jpg",
+        "width": 1200,
+        "height": 1600,
+        "bytes": 241432,
+        "sha256": "83f8f7fe8bb5b53f98afe7eec9e0a015fc3ab166c71ce6bd89771a7a480b4052"
       }
     },
     {

@@ -39,6 +39,13 @@
         "height": 640,
         "bytes": 46434,
         "sha256": "3c1dcbc1a3afc2cfb9019a8d2ca8db4e1e3bc622d8bceb79d2bf5440147901c6"
+      },
+      "display": {
+        "src": "/public-media/1EG/1EG-0002/1EG-0002-01-display.jpg",
+        "width": 1200,
+        "height": 1600,
+        "bytes": 218151,
+        "sha256": "2ec8e9ac8e727dfcdf999358c6f1243f6d27faa95d208d26a420617c00414b5d"
       }
     }
   ]

@@ -46,15 +46,16 @@ const GOVERNED = /^(catalog|issued-record-ids|export-manifest)\.json$|^items\/1E
 ok("public-data holds only the governed document set", docs.length > 0 && docs.every((f) => GOVERNED.test(f)), docs.filter((f) => !GOVERNED.test(f)).join());
 const items = docs.filter((f) => f.startsWith("items/")), containers = docs.filter((f) => f.startsWith("containers/"));
 const referenced = new Map();
-const MEDIA_SRC = (id) => new RegExp(`^/public-media/1EG/${id}/${id}-\\d{2}(-thumb)?\\.(jpg|mp4)$`);
+const MEDIA_SRC = (id) => new RegExp(`^/public-media/1EG/${id}/${id}-\\d{2}(-thumb|-display)?\\.(jpg|mp4)$`);
 function media(owner, list, at) {
   ok(`${at}: media is an array`, Array.isArray(list));
   for (const m of list || []) {
-    ok(`${at}: media entry keys exact`, exact(m, m.thumb ? ["type", "mediaType", "src", "width", "height", "bytes", "sha256", "thumb"] : ["type", "mediaType", "src", "width", "height", "bytes", "sha256"]));
+    ok(`${at}: media entry keys exact`, exact(m, m.type === "image" ? ["type", "mediaType", "src", "width", "height", "bytes", "sha256", "thumb", "display"] : ["type", "mediaType", "src", "width", "height", "bytes", "sha256"]));
     ok(`${at}: media src governed`, MEDIA_SRC(owner).test(m.src), m.src);
     ok(`${at}: media type`, (m.type === "image" && m.mediaType === "image/jpeg" && m.src.endsWith(".jpg")) || (m.type === "video" && m.mediaType === "video/mp4" && m.src.endsWith(".mp4")));
     referenced.set(m.src, m.sha256);
     if (m.thumb) { ok(`${at}: thumb keys exact`, exact(m.thumb, ["src", "width", "height", "bytes", "sha256"])); ok(`${at}: thumb src governed`, MEDIA_SRC(owner).test(m.thumb.src) && m.thumb.src.endsWith("-thumb.jpg")); referenced.set(m.thumb.src, m.thumb.sha256); }
+    if (m.display) { ok(`${at}: display keys exact`, exact(m.display, ["src", "width", "height", "bytes", "sha256"])); ok(`${at}: display src governed`, MEDIA_SRC(owner).test(m.display.src) && m.display.src.endsWith("-display.jpg")); referenced.set(m.display.src, m.display.sha256); }
   }
 }
 for (const f of items) {

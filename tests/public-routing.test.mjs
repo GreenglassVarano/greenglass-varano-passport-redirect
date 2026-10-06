@@ -62,7 +62,8 @@ console.log("=== 1. Published Item ===");
   ok("/1EG/1EG-0001 → 200 HTML", res.status === 200 && /text\/html/.test(res.headers.get("content-type")));
   ok("renders the published Item name + Record ID", body.includes("Coffee cup") && body.includes(">1EG-0001<"));
   ok("renders a published field (Description)", body.includes("Coffee cup used"));
-  ok("hero image + video come from public-media only", body.includes('src="/public-media/1EG/1EG-0001/1EG-0001-01.jpg"') && body.includes('src="/public-media/1EG/1EG-0001/1EG-0001-04.mp4"'));
+  ok("hero = 1600px display rendition, linking to the full sanitized original", body.includes('<a class="hero" href="/public-media/1EG/1EG-0001/1EG-0001-01.jpg"><img src="/public-media/1EG/1EG-0001/1EG-0001-01-display.jpg"'));
+  ok("video comes from public-media only", body.includes('src="/public-media/1EG/1EG-0001/1EG-0001-04.mp4"'));
   ok("links the published Container", body.includes('href="/1EG/1EG-C-0001"'));
   const s = staffHrefs(body);
   ok("exactly one staff control: Open in Field Editor (intent=edit)", s.length === 1 && body.includes("Greenglass Varano Staff · Open in Field Editor") && staffLinkOk(s[0], "1EG-0001", "edit"), s.join());
@@ -185,7 +186,7 @@ console.log("\n=== 13. Site paths outside /1EG ===");
   const home = await site("/"); const hb = await home.text();
   ok("/ → 200 catalogue with search + Items/Containers tabs, security headers", home.status === 200 && hb.includes('id="q"') && hb.includes('data-kind="container"') && hasSec(home));
   ok("catalogue page has no inline script/handler (CSP script-src 'self')", !/<script(?![^>]*\bsrc=)/i.test(hb) && !/\son[a-z]+=/i.test(hb));
-  for (const p of ["/assets/passport.css", "/assets/catalog.js", "/robots.txt", "/public-data/1EG/catalog.json", "/public-data/1EG/items/1EG-0001.json", "/public-media/1EG/1EG-0001/1EG-0001-01-thumb.jpg", "/public-media/1EG/1EG-0001/1EG-0001-04.mp4"]) {
+  for (const p of ["/assets/passport.css", "/assets/catalog.js", "/robots.txt", "/public-data/1EG/catalog.json", "/public-data/1EG/items/1EG-0001.json", "/public-media/1EG/1EG-0001/1EG-0001-01-thumb.jpg", "/public-media/1EG/1EG-0001/1EG-0001-01-display.jpg", "/public-media/1EG/1EG-0001/1EG-0001-04.mp4"]) {
     const r = await site(p); ok(`${p} → 200 (public static)`, r.status === 200 && hasSec(r), r.status);
   }
   for (const p of ["/README.md", "/route-test.js", "/lib/passport.mjs", "/functions/[[path]].js", "/tests/public-routing.test.mjs", "/.github/workflows/redirect-tests.yml",
