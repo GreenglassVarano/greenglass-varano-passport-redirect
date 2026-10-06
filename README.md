@@ -1,12 +1,18 @@
-# 1EG Passport — durable-URL redirect host
+# Project Passport — public Passport host (`passport.greenglassvarano.com`)
 
-Translates the permanent public QR-facing URL
+> **Branch `passport/public-experience` — PREVIEW ONLY. Not merged, not in Production.**
+> `main` still runs the HK09 implementation (a `302` to the SharePoint Passport page) and is
+> the rollback baseline. Cutover to this branch requires separate owner authorization
+> (PASSPORT-ADR-002 / PASSPORT-DES-003 §12 / PASSPORT-ICR-005).
+
+On this branch the durable QR URL
 
     https://passport.greenglassvarano.com/1EG/<RecordID>
 
-to the current SharePoint Passport destination
-
-    https://dbgroupcorp.sharepoint.com/sites/1EG-PreservedItemCatalogue/SitePages/Passport.aspx?p=<RecordID>
+serves an **anonymous, read-only public Passport** rendered from a static export of the
+governed **published read model**. There is no Microsoft sign-in, no guest invitation, no
+SharePoint hop and no Power Apps scanner dependency for the public. Staff reach the
+authenticated Field Editor from a control on every page.
 
 ## Product boundary
 
@@ -22,165 +28,85 @@ Project Passport's reusable domain is inventory identity, item/container records
 
 Project Handshake may reuse selected Passport infrastructure such as durable QR IDs, redirect/deep-link patterns and permission-aware views, while remaining a separate people/access/contact product.
 
-## The contract
+## The contract (unchanged)
 
-**The durable hostname and path are the public identity contract.** They are printed
-into QR codes and are permanent:
+**The durable hostname and path are the public identity contract.** They are printed into
+QR codes and are permanent. This branch changes what is *behind* the URL, never the URL:
+no QR regeneration, no change to PassportURL / QRCodeURL, no hostname change.
+Cloudflare Pages, the export and the renderer are replaceable implementation.
 
-    https://passport.greenglassvarano.com/1EG/<RecordID>
+## Data boundary
 
-**Cloudflare Pages is replaceable implementation infrastructure.** So is GitHub Pages,
-so is the SharePoint destination. None of them is the contract.
-
-- **The backend SharePoint hop is `302`, never `301`.** The hostname is permanent; the
-  SharePoint URL is not. A cacheable permanent redirect would burn today's backend into
-  clients that already scanned a code, and weaken future portability. **No rule in this
-  repository uses `301`** — canonicalising the Cloudflare-generated hostname onto the
-  durable one is a hostname-level redirect and is handled outside this repository
-  (see "Canonicalising the pages.dev hostname").
-- **Changing the backend requires no QR regeneration.** Only `_redirects` changes.
-- **Batch 002 URLs remain unchanged**, and remain valid across this migration.
-- **The host holds no data** and is **deliberately dumb**: it does not check whether a
-  Record ID exists. Item-vs-Container routing and "Passport not found" are decided by
-  the SPFx Passport page.
-- **Only the Record ID is preserved.** No inbound query string, tracking, session or
-  user-specific parameter is forwarded.
-
-## Routing authority — split, deliberately
-
-| route | handled by |
+| what | where it comes from |
 |---|---|
-| `/1EG/<one path segment>` | **`functions/1EG/[id].js`** — the Pages Function |
-| everything else | the rules in **`_redirects`** |
+| public Item / Container fields | `public-data/1EG/{items,containers}/*.json` — the publisher's **public projection**, exported by the governed tool in the KB (`01_WORKING/Project_Passport/Source/Public-Export/`) |
+| photographs / video | `public-media/1EG/<id>/*` — **Anonymous Public Media**: only files associated with a published record **and** explicitly approved for anonymous publication after a privacy review (ADR-002 D14; default deny). Sanitized copies (metadata removed and proven; originals never committed). Public file names are stable and never reused, so numbering may have gaps. |
+| "not yet activated" | `public-data/1EG/issued-record-ids.json` — issued identities only (no names, no status) |
+| catalogue | `public-data/1EG/catalog.json` |
+| evidence | `public-data/1EG/export-manifest.json` — input hashes, policy, SHA-256 of every output |
 
-Cloudflare applies a matching Pages Function ahead of `_redirects`, and **redirects
-declared in `_redirects` do not apply to a request served by a matching Function**. The
-Function therefore owns the dynamic Record-ID route outright; `_redirects` owns the
-static fallbacks and substitutes nothing.
+**This deployment holds no Microsoft credential, token, tenant secret, Graph access or
+operational SharePoint path.** The renderer reads only its own static assets
+(`env.ASSETS`). Location / custody / Event Log / notes / users / Tag Status and any
+unpublished media are never exported (ADR-002 D13: the location read model is deliberately
+omitted from the anonymous export).
 
-- The Function matches **one** segment after `/1EG/`. A trailing slash is accepted.
-- **Nested paths do not match** the single-segment Function and fall through to
-  `_redirects`, which sends them to the Landing — never a fabricated Record ID.
-
-| request | result | status |
-|---|---|---|
-| `/1EG/1EG-0001` | `…Passport.aspx?p=1EG-0001` | 302 |
-| `/1EG/1EG-C-0001` | `…Passport.aspx?p=1EG-C-0001` | 302 |
-| `/1EG/1eg-0001` | `…Passport.aspx?p=1eg-0001` (verbatim; SPFx upper-cases) | 302 |
-| `/1EG/1EG-9999` | `…Passport.aspx?p=1EG-9999` (well-formed, absent) | 302 |
-| `/1EG/GARBAGE` | `…Passport.aspx?p=GARBAGE` (malformed, still forwarded) | 302 |
-| `/1EG/1EG-0001/` | `…Passport.aspx?p=1EG-0001` (trailing slash tolerated) | 302 |
-| `/1EG/1EG-0001?utm_source=qr&sid=abc` | `…Passport.aspx?p=1EG-0001` (inbound query discarded) | 302 |
-| `/1EG/X&admin=1` | `…Passport.aspx?p=X%26admin%3D1` — **one** parameter | 302 |
-| `/1EG/`, `/1EG` | Passport Landing, no `?p=` | 302 |
-| `/` | Passport Landing | 302 |
-| `/wrong/1EG-0001` | Passport Landing (never a fabricated ID) | 302 |
-| `/1EG/a/b/c`, nested | Passport Landing (never a fabricated ID) | 302 |
-
-**No open redirect.** Every destination is a hard-coded absolute URL on
-`dbgroupcorp.sharepoint.com`. Nothing from the request reaches the destination scheme,
-hostname or path — the Record ID lands only in the `p` query value, added through
-`URLSearchParams.set`, which encodes it.
-
-## Why the Pages Function exists — measured, not assumed
-
-`_redirects` alone was **proven insufficient on the real Cloudflare edge**. Cloudflare
-substitutes a captured placeholder **verbatim and unencoded**, so a raw query delimiter
-in the path escaped the intended `p` parameter:
-
-| request | `Location` produced by `_redirects` | parsed |
-|---|---|---|
-| `/1EG/X&admin=1` | `…Passport.aspx?p=X&admin=1` | `p=X` **and** `admin=1` |
-| `/1EG/1EG-0001&utm=x` | `…Passport.aspx?p=1EG-0001&utm=x` | `p=1EG-0001` **and** `utm=x` |
-| `/1EG/A&b&c` | `…Passport.aspx?p=A&b&c` | three parameters |
-
-The second row is the dangerous one: a **valid** Record ID still routed correctly while
-an attacker-chosen parameter rode along into the SharePoint request. Percent-encoded
-input was safe (`/1EG/X%26admin%3D1` stayed one parameter) because Cloudflare does not
-decode — the defect was specific to **raw** delimiters.
-
-`_redirects` has no way to encode a captured value, so the dynamic route moved to the
-Function, where the destination is built with the URL API. The two `:id` rules were
-**removed** from `_redirects`; CI fails if a `?p=` or `:placeholder` rule reappears.
-
-### Malformed percent-encoding — measured on the real edge
-
-Behaviour **differs between the two implementations**, so the two are recorded
-separately. Both were measured; neither is inferred.
-
-**Phase 2A / pre-Function behaviour** (`_redirects` owned the Record-ID route):
+## Routes
 
 | request | result |
 |---|---|
-| `/1EG/%ZZ` | **400**, no `Location` |
-| `/1EG/%` | **500**, no `Location` |
-| `/1EG/..%2F..%2Fevil.com` | **400**, no `Location` |
+| `/` | catalogue — intro, search by Record ID or name, Items / Containers, thumbnails |
+| `/1EG/1EG-0001` (published Item) | **200** Item Passport + staff control *Open in Field Editor* |
+| `/1EG/1EG-C-0001` (published Container) | **200** Container Passport + Contents + staff control *Open Container* |
+| `/1EG/1EG-0003` (issued, not published) | **200** "This Passport has not yet been activated." + staff control *Activate Passport* |
+| `/1EG/1EG-9999`, `/1EG/GARBAGE`, `/1EG/1EG-TEST` | **404** neutral *Passport not found* (no staff control) |
+| `/1EG/1eg-0001`, `/1EG/1EG-0001/`, `/1EG/1EG%2D0001` | **308** → `/1EG/1EG-0001` (canonical) |
+| `/1EG`, `/1EG/` | **308** → `/` |
+| `/1EG/1EG-0001?utm_source=qr` | the inbound query is ignored |
+| `/1EG/X&admin=1`, `/1EG/1EG-0001&utm=x`, encoded delimiters | **404** — never parsed as parameters |
+| `/1EG/a/b`, any nested path | **404** — never a fabricated ID |
+| anything else not explicitly public (README, tests, lib, workflows, …) | **404** |
 
-**Phase 2A.1 / current Function behaviour** — this is the behaviour that ships:
+Every redirect is a same-origin path. Responses carry a strict CSP (`default-src 'none'`,
+self-only scripts/styles/media, no framing), `nosniff`, `no-referrer` and `noindex`.
 
-| request | result |
-|---|---|
-| `/1EG/%ZZ` | **400**, no `Location` — rejected by the edge before the Function runs |
-| `/1EG/..%2F..%2Fevil.com` | **400**, no `Location` — rejected by the edge before the Function runs |
-| **`/1EG/%`** | **302** → `…Passport.aspx?p=%25`, parsed **`p = %`** — the Function handles it cleanly |
+## Staff handoff
 
-So the Function *improved* one case: the bare `%` that previously produced a 500 now
-produces a normal single-parameter redirect. The two genuinely malformed escapes are
-still rejected by Cloudflare **before** any Function or redirect rule runs. **Failing
-closed is acceptable** and no attempt is made to bypass it; a damaged QR scan yields an
-error page rather than the Landing.
+The staff control is an HTTPS link to the Field Editor's App Details web link with exactly
+four parameters, built with the URL API from a **validated** Record ID:
+
+    https://apps.powerapps.com/play/e/<env>/a/<app>?tenantId=<tenant>&id=<RecordID>&entry=passport&intent=edit|activate
+
+The page does not try to detect staff — Power Apps authenticates. On this branch the link
+targets **`1EG - Passport App - QA`** and pages show the marker **QA STAFF HANDOFF**;
+Production values are set only at cutover (one `CONFIG` block in `lib/passport.mjs`).
 
 ## Files
 
 | file | role |
 |---|---|
-| `functions/1EG/[id].js` | **production** — Pages Function; sole authority for `/1EG/<RecordID>` |
-| `_redirects` | **production** — static fallbacks; substitutes nothing |
-| `route-test.js` | `node route-test.js` — **invokes** the shipped Function and parses the shipped `_redirects` |
-| `.github/workflows/redirect-tests.yml` | CI — runs the suite on every push and PR |
-| `index.html` | **rollback** — GitHub Pages bare host `/` → Landing |
-| `404.html` | **rollback** — GitHub Pages client-side `/1EG/<id>` → `?p=<id>` |
-| `CNAME` | custom domain marker — `passport.greenglassvarano.com` |
+| `lib/passport.mjs` | all routing, rendering, staff-link construction, security headers |
+| `functions/1EG/[[path]].js` | thin wrapper — `/1EG` and everything below it |
+| `functions/[[path]].js` | thin wrapper — serves only the explicitly public static paths |
+| `index.html`, `assets/catalog.js`, `assets/passport.css` | catalogue + GV brand styling (no third-party requests) |
+| `404.html`, `robots.txt` | neutral not-found page; `Disallow: /` |
+| `public-data/`, `public-media/` | the governed export (do not hand-edit — re-run the export) |
+| `tests/public-routing.test.mjs` | routing + rendering + staff-link contract — **invokes the shipped renderer** |
+| `tests/public-data-leak.test.mjs` | allowlist / denylist / hash / manifest / media-metadata leak test |
+| `.github/workflows/redirect-tests.yml` | CI — runs both suites and the structural guards on every push and PR |
+| `CNAME` | `passport.greenglassvarano.com` |
 
-`index.html` and `404.html` are the **GitHub Pages pilot mechanism** and remain the
-rollback implementation until HK09 closes. GitHub Pages ignores `_redirects`; Cloudflare
-Pages ignores the HTML fallbacks because redirects are applied ahead of asset matching.
-Both can therefore coexist during the migration.
+    node tests/public-routing.test.mjs
+    node tests/public-data-leak.test.mjs
 
-## Staging acceptance — settled on the real edge
+The HK09 `route-test.js`, `functions/1EG/[id].js` and `_redirects` are retired **on this
+branch only**; they remain on `main` with the SharePoint redirect they test.
 
-Both previously undocumented behaviours were probed on a Cloudflare Pages preview and are
-now settled facts:
+## Rollback
 
-1. **Inbound query strings do not leak.** `/1EG/1EG-0001?utm_source=qr&sid=abc` produced
-   exactly `…Passport.aspx?p=1EG-0001` — no `utm_source`, no `sid`, no second `?`.
-2. **Placeholder substitution was NOT encoded** — this is what forced the Function. See
-   "Why the Pages Function exists" above.
-
-Before any DNS change, re-confirm on a preview deployment that
-`/1EG/1EG-0001&utm=x` yields a destination whose query parameters are exactly
-`p=1EG-0001&utm=x` and nothing else, and that `curl -sI` returns a real `HTTP/2 302`
-with a `Location` header rather than an HTML page.
-
-## Canonicalising the `pages.dev` hostname — NOT done in this repository
-
-**Cloudflare Pages `_redirects` matches paths only. It cannot match on hostname**, so
-`greenglass-varano-passport-redirect.pages.dev` → `passport.greenglassvarano.com`
-**cannot** be expressed in `_redirects`. An earlier revision of this repository carried a
-commented-out example implying it could; that was wrong and has been removed.
-
-The supported mechanism is an account-level **Cloudflare Bulk Redirect**:
-
-| field | value |
-|---|---|
-| source hostname | `greenglass-varano-passport-redirect.pages.dev` |
-| destination | `https://passport.greenglassvarano.com` |
-| status | **301** |
-| options | preserve path suffix · preserve query string · subpath matching |
-
-**Intent:** canonicalise the Cloudflare-generated production hostname onto the permanent
-public hostname, so only the durable URL is ever indexed or shared.
-
-It is created in the **Cloudflare dashboard, not in this repository**, and only **after**
-the durable custom domain has successfully cut over and passed acceptance testing. It
-does not exist yet.
+Production serves `main`. Until cutover, nothing on this branch affects
+`passport.greenglassvarano.com`. After cutover, rollback = redeploy the recorded
+pre-cutover `main` commit (SharePoint `302`) in Cloudflare Pages; QR codes are unaffected
+either way. The `pages.dev` → durable-host Bulk Redirect (HK09 Phase 2B) covers the
+production `pages.dev` hostname only, so branch preview hostnames remain reachable for
+acceptance testing.

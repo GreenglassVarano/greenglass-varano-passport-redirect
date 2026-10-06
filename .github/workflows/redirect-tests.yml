@@ -1,11 +1,13 @@
-# 1EG Passport redirect host — routing-contract tests.
-# Project Blackbook HK09 Phase 2A / 2A.1.
+# Project Passport — public experience contract tests (PASSPORT-DES-003 / ICR-005).
 #
-# Runs the deterministic, offline routing-contract suite on every push and pull
-# request. The suite loads and INVOKES the shipped Pages Function and parses the
-# shipped `_redirects`, so neither can drift away from its tests.
-# No network, no secrets, no deployment.
-name: Redirect contract tests
+# Runs on every push and pull request. Offline: no network, no secrets, no deployment.
+#   1. Routing + rendering contract — imports the SHIPPED lib/passport.mjs (the Pages
+#      Functions are one-line wrappers over it) and serves this repository's own files.
+#   2. Public data + media leak test — allowlist, denylist, hashes, manifest, and a
+#      structural metadata scan of every public JPEG / MP4.
+#   3. Structural guards — the durable identity and the no-credential boundary.
+# The HK09 SharePoint-302 suite (route-test.js) remains on `main` with the code it tests.
+name: Public Passport contract tests
 
 on:
   push:
@@ -16,39 +18,20 @@ permissions:
   contents: read
 
 jobs:
-  route-contract:
+  public-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
-      - name: Routing contract (invokes the Function, parses _redirects)
-        run: node route-test.js
+      - name: Routing + rendering contract (invokes the shipped renderer)
+        run: node tests/public-routing.test.mjs
 
-      - name: The Pages Function must be the sole Record-ID authority
-        run: |
-          set -e
-          test -f "functions/1EG/[id].js" || { echo "::error::functions/1EG/[id].js is missing"; exit 1; }
-          if grep -vE '^\s*#|^\s*$' _redirects | grep -q '?p='; then
-            echo "::error::a ?p= rule reappeared in _redirects — the Function must own the Record-ID route"
-            exit 1
-          fi
-          if grep -vE '^\s*#|^\s*$' _redirects | grep -qE '(^|[[:space:]])/[^[:space:]]*:[A-Za-z_]'; then
-            echo "::error::a :placeholder rule reappeared in _redirects"
-            exit 1
-          fi
-          echo "Function present; _redirects carries no dynamic Record-ID rule"
-
-      - name: Rollback files must remain intact until HK09 closes
-        run: |
-          set -e
-          for f in index.html 404.html CNAME; do
-            test -f "$f" || { echo "::error::rollback file $f is missing"; exit 1; }
-          done
-          echo "index.html, 404.html and CNAME are present"
+      - name: Public data + media leak test
+        run: node tests/public-data-leak.test.mjs
 
       - name: CNAME must remain the durable public identity
         run: |
@@ -60,3 +43,21 @@ jobs:
             exit 1
           fi
           echo "CNAME = $actual"
+
+      - name: No credential, token or operational endpoint in the deployment
+        run: |
+          set -e
+          if grep -rIniE 'client_secret|bearer |authorization:|access_token|refresh_token|login\.microsoftonline|graph\.microsoft|_api/web|sharepoint\.com' \
+               --include='*.js' --include='*.mjs' --include='*.html' --include='*.json' --include='*.css' \
+               lib functions assets public-data index.html 404.html; then
+            echo "::error::a credential or operational endpoint appeared in a served or runtime file"
+            exit 1
+          fi
+          echo "no credential / operational endpoint in lib, functions, assets, public-data or pages"
+
+      - name: Only sanitized public media formats are present
+        run: |
+          set -e
+          bad="$(find public-media -type f ! -name '*.jpg' ! -name '*.mp4' || true)"
+          if [ -n "$bad" ]; then echo "::error::unexpected media files: $bad"; exit 1; fi
+          echo "public-media holds only .jpg / .mp4"
