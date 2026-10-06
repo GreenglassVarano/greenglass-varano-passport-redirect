@@ -17,6 +17,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ORIGIN = "https://passport.greenglassvarano.com";
 const QA_APP = "fb9830e5-7a74-4e88-8327-75a8d86dd313";
 const PROD_APP = "cc95f525-bd3c-4c4b-8ad2-1e6be1ed268d";
+const TARGET_APP = PROD_APP; // Production build
 let pass = 0, fail = 0;
 const ok = (label, cond, detail) => { cond ? pass++ : fail++; console.log(`${cond ? "PASS" : "FAIL"}  ${label}${!cond && detail ? "\n      << " + detail : ""}`); };
 
@@ -38,10 +39,10 @@ const staffHrefs = (html) => [...html.matchAll(/class="staff-btn" href="([^"]*)"
 const SEC = ["content-security-policy", "x-content-type-options", "referrer-policy", "x-frame-options", "x-robots-tag"];
 const hasSec = (res) => SEC.every((h) => res.headers.get(h));
 
-/** A staff link must be exactly: QA Field Editor, 4 parameters, the validated id. */
+/** A staff link must be exactly: the target (Production) Field Editor, 4 parameters, the validated id. */
 function staffLinkOk(href, id, intent) {
   const u = new URL(href);
-  return u.origin === "https://apps.powerapps.com" && u.pathname.endsWith(`/a/${QA_APP}`) &&
+  return u.origin === "https://apps.powerapps.com" && u.pathname.endsWith(`/a/${TARGET_APP}`) &&
     [...u.searchParams.keys()].sort().join() === "entry,id,intent,tenantId" &&
     u.searchParams.get("id") === id && u.searchParams.get("intent") === intent &&
     u.searchParams.get("entry") === "passport" && u.searchParams.get("tenantId") === CONFIG.tenantId;
@@ -68,7 +69,7 @@ console.log("=== 1. Published Item ===");
   const s = staffHrefs(body);
   ok("exactly one staff control: Open in Field Editor (intent=edit)", s.length === 1 && body.includes("Greenglass Varano Staff · Open in Field Editor") && staffLinkOk(s[0], "1EG-0001", "edit"), s.join());
   ok("staff href is HTML-escaped in the markup (&amp; separators)", /class="staff-btn" href="https:\/\/apps\.powerapps\.com\/[^"]*&amp;id=1EG-0001&amp;entry=passport&amp;intent=edit"/.test(body));
-  ok("preview marker 'QA STAFF HANDOFF' is shown", body.includes(">QA STAFF HANDOFF<"));
+  ok("Production build shows no environment marker", !/QA STAFF HANDOFF|env-marker/.test(body));
   ok("security headers present (CSP, nosniff, no-referrer, DENY, noindex)", hasSec(res));
   ok("no SharePoint / tenant host / location / Tag Status text in the page", !/sharepoint|dbgroupcorp|StorageLocation|Tag Status|field_\d/i.test(body));
   ok("no inline script and no third-party origin in the page", !/<script/i.test(body) && ![...body.matchAll(/(?:src|href)="(https?:[^"]*)"/g)].some((m) => !m[1].startsWith("https://apps.powerapps.com/")));
@@ -166,7 +167,7 @@ for (const bad of ["delete", "", "EDIT", "edit&x=1"]) {
   let threw = false; try { staffLink("1EG-0001", bad); } catch { threw = true; }
   ok(`staffLink rejects an unknown intent ${JSON.stringify(bad)}`, threw);
 }
-ok("PREVIEW config targets the QA app, never Production", CONFIG.staffAppUrl.endsWith(`/a/${QA_APP}`) && !CONFIG.staffAppUrl.includes(PROD_APP) && CONFIG.environmentMarker === "QA STAFF HANDOFF");
+ok("PRODUCTION config targets the Production app, never QA, with no marker", CONFIG.staffAppUrl.endsWith(`/a/${PROD_APP}`) && !CONFIG.staffAppUrl.includes(QA_APP) && CONFIG.environmentMarker === null);
 ok("staff link host is apps.powerapps.com over HTTPS", new URL(CONFIG.staffAppUrl).protocol === "https:" && new URL(CONFIG.staffAppUrl).host === "apps.powerapps.com");
 
 console.log("\n=== 12. Output encoding (hostile published values cannot inject markup) ===");

@@ -1,6 +1,7 @@
 # Project Passport — public Passport host (`passport.greenglassvarano.com`)
 
-> **Branch `passport/public-experience` — PREVIEW ONLY. Not merged, not in Production.**
+> **Branch `passport/public-experience-production-cutover` — Production-configured build of the preview.**
+> Promotion to `main` (= Production) requires the owner's cutover authorization.
 > `main` still runs the HK09 implementation (a `302` to the SharePoint Passport page) and is
 > the rollback baseline. Cutover to this branch requires separate owner authorization
 > (PASSPORT-ADR-002 / PASSPORT-DES-003 §12 / PASSPORT-ICR-005).
@@ -77,9 +78,10 @@ four parameters, built with the URL API from a **validated** Record ID:
 
     https://apps.powerapps.com/play/e/<env>/a/<app>?tenantId=<tenant>&id=<RecordID>&entry=passport&intent=edit|activate
 
-The page does not try to detect staff — Power Apps authenticates. On this branch the link
-targets **`1EG - Passport App - QA`** and pages show the marker **QA STAFF HANDOFF**;
-Production values are set only at cutover (one `CONFIG` block in `lib/passport.mjs`).
+The page does not try to detect staff — Power Apps authenticates. **This is the Production
+build:** the link targets **`1EG - Passport App`** (`cc95f525-…`, from App Details) and no
+environment marker is shown. `tests/production-config.test.mjs` fails the build if any QA app
+id, QA app name or QA marker appears in shipped code or data.
 
 ## Files
 

@@ -33,6 +33,9 @@ jobs:
       - name: Public data + media leak test
         run: node tests/public-data-leak.test.mjs
 
+      - name: Production configuration invariants (no QA identifier / marker)
+        run: node tests/production-config.test.mjs
+
       - name: CNAME must remain the durable public identity
         run: |
           set -e
